@@ -1,0 +1,58 @@
+service: serverless-step-functions-example
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+
+plugins:
+  - serverless-step-functions
+
+functions:
+  checkInventory:
+    handler: handler.checkInventory
+  calculateTotal:
+    handler: handler.calculateTotal
+
+stepFunctions:
+  stateMachines:
+    checkoutStoreFlow:
+      name: checkoutStoreFlow
+      definition:
+        StartAt: checkInvntory
+        States:
+          checkInvntory:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [checkInventory, Arn]
+            Next: calculateTotal
+          calculateTotal:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [calculateTotal, Arn]
+            End: true
+
+resources:
+  Resources:
+    BooksTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        KeySchema:
+          - AttributeName: bookId
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: bookId
+            AttributeType: S
+        TableName: stepfunction-books
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        TableName: stepfunction-users
+      
