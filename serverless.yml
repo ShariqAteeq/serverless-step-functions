@@ -3,6 +3,13 @@ service: serverless-step-functions-example
 provider:
   name: aws
   runtime: nodejs12.x
+  iamRoleStatements:
+    - Effect: Allow
+      Action: dynamodb:*
+      Resource: !GetAtt BooksTable.Arn
+    - Effect: Allow
+      Action: dynamodb:*
+      Resource: !GetAtt UsersTable.Arn
 
 plugins:
   - serverless-step-functions
@@ -12,6 +19,10 @@ functions:
     handler: handler.checkInventory
   calculateTotal:
     handler: handler.calculateTotal
+  redeemPoints:
+    handler: handler.redeemPoints
+  billCustomer:
+    handler: handler.billCustomer
 
 stepFunctions:
   stateMachines:
@@ -25,10 +36,42 @@ stepFunctions:
             Resource:
               Fn::GetAtt: [checkInventory, Arn]
             Next: calculateTotal
+            Catch:
+              - ErrorEquals: [BookOutOfStock]
+                Next: BookOutOfStockError
+              - ErrorEquals: [BookNotFound]
+                Next: BookNotFoundError
+            ResultPath: $.book
           calculateTotal:
             Type: Task
             Resource:
               Fn::GetAtt: [calculateTotal, Arn]
+            ResultPath: $.total
+            Next: IsRedeemNeeded
+          IsRedeemNeeded:
+            Type: Choice
+            Choices:
+              - Variable: $.redeem
+                BooleanEquals: true
+                Next: RedeemPoionts
+            Default: BillCustomer
+          RedeemPoionts:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [redeemPoints, Arn]
+            Next: BillCustomer
+          BillCustomer:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [billCustomer, Arn]
+            Next: prepareOrder
+          BookOutOfStockError:
+            Type: Pass
+            Result: "Book is out of stock"
+            End: true
+          BookNotFoundError:
+            Type: Pass
+            Result: "Book not found/"
             End: true
 
 resources:
